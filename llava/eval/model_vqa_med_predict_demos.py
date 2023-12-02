@@ -275,6 +275,8 @@ def eval_model(args):
             prompt = conv.get_prompt()
             inputs = tokenizer([prompt])
 
+            print(prompt)
+
             input_ids = torch.as_tensor(inputs.input_ids).cuda()
 
             keywords = ["###"]
@@ -309,6 +311,7 @@ def eval_model(args):
                 index = outputs.index(conv.sep)
 
             outputs = outputs[:index].strip()
+            print(outputs)
 
             lines = outputs.split("\n")
 
@@ -324,6 +327,7 @@ def eval_model(args):
                 json.dumps(
                     {
                         "id": idx,
+                        "prompt": prompt,
                         "text": outputs,
                         "rationale": rationale,
                         "pred": pred,
