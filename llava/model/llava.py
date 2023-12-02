@@ -303,6 +303,7 @@ class LlavaLlamaModel(LlamaModel):
             new_input_embeds = []
             cur_image_idx = 0
             print(image_features.shape)
+            print(input_ids.shape)
             for cur_input_ids, cur_input_embeds in zip(input_ids, inputs_embeds):
                 if (cur_input_ids == vision_tower.config.im_patch_token).sum() == 0:
                     # multimodal LLM, but the current sample is not multimodal
