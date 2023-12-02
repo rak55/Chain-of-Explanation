@@ -179,6 +179,7 @@ def eval_model(args):
     #     model_name
     # )
     model, tokenizer, image_processor, image_token_len = load_model(model_name)
+    print(image_token_len)
 
     print(f"Loading dataset: {args.dataset} ({args.split})")
     dataset = load_dataset(args.dataset)
