@@ -119,7 +119,6 @@ def eval_model(args):
             image = ex["image"]
             question = ex["question"]
             answer = ex["answer"]
-            idx = line["id"]
 
             qs = question
             image_tensor = image_processor.preprocess(image, return_tensors="pt")[
