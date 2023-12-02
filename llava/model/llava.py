@@ -20,11 +20,20 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import CrossEntropyLoss
 
-from transformers import AutoConfig, AutoModelForCausalLM, \
-                         LlamaConfig, LlamaModel, LlamaForCausalLM, \
-                         CLIPVisionModel, CLIPImageProcessor
+from transformers import (
+    AutoConfig,
+    AutoModelForCausalLM,
+    LlamaConfig,
+    LlamaModel,
+    LlamaForCausalLM,
+    CLIPVisionModel,
+    CLIPImageProcessor,
+)
 
-from transformers.modeling_outputs import BaseModelOutputWithPast, CausalLMOutputWithPast
+from transformers.modeling_outputs import (
+    BaseModelOutputWithPast,
+    CausalLMOutputWithPast,
+)
 from llava.model.utils import *
 import open_clip
 import os, json
@@ -45,41 +54,68 @@ class LlavaLlamaModel(LlamaModel):
     def __init__(self, config: LlamaConfig, mm_vision_tower=None, mm_hidden_size=None):
         super(LlavaLlamaModel, self).__init__(config)
 
-        self.vision_tower_name = "openai/clip-vit-large-patch14" # microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224 # openai/clip-vit-large-patch14
+        self.vision_tower_name = "openai/clip-vit-large-patch14"  # microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224 # openai/clip-vit-large-patch14
         if hasattr(config, "mm_vision_tower"):
             # HACK: for FSDP
-            
-            if "BiomedCLIP" in config.mm_vision_tower or "biomed_clip" in config.mm_vision_tower:
-                model, _, _ = open_clip.create_model_and_transforms('hf-hub:microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224')
-                self.vision_tower = [model.visual.trunk] # Please refer: https://github.com/mlfoundations/open_clip/blob/main/src/open_clip/timm_model.py#LL60C18-L60C18
-                self.vision_tower_name = "microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224"
-            else:
-                self.vision_tower = [CLIPVisionModel.from_pretrained(config.mm_vision_tower)]
 
+            if (
+                "BiomedCLIP" in config.mm_vision_tower
+                or "biomed_clip" in config.mm_vision_tower
+            ):
+                model, _, _ = open_clip.create_model_and_transforms(
+                    "hf-hub:microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224"
+                )
+                self.vision_tower = [
+                    model.visual.trunk
+                ]  # Please refer: https://github.com/mlfoundations/open_clip/blob/main/src/open_clip/timm_model.py#LL60C18-L60C18
+                self.vision_tower_name = (
+                    "microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224"
+                )
+            else:
+                self.vision_tower = [
+                    CLIPVisionModel.from_pretrained(config.mm_vision_tower)
+                ]
 
         if hasattr(config, "use_mm_proj"):
             self.mm_projector = nn.Linear(config.mm_hidden_size, config.hidden_size)
 
-    def initialize_vision_modules(self, vision_tower, mm_vision_select_layer,
-                                  pretrain_mm_mlp_adapter=None, tune_mm_mlp_adapter=False):
-
+    def initialize_vision_modules(
+        self,
+        vision_tower,
+        mm_vision_select_layer,
+        pretrain_mm_mlp_adapter=None,
+        tune_mm_mlp_adapter=False,
+    ):
         if "BiomedCLIP" in vision_tower:
-            self.vision_tower_name = "microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224"
-            return self.initialize_vision_modules_from_biomed_clip(vision_tower, mm_vision_select_layer,
-                                pretrain_mm_mlp_adapter=None, tune_mm_mlp_adapter=False)
+            self.vision_tower_name = (
+                "microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224"
+            )
+            return self.initialize_vision_modules_from_biomed_clip(
+                vision_tower,
+                mm_vision_select_layer,
+                pretrain_mm_mlp_adapter=None,
+                tune_mm_mlp_adapter=False,
+            )
         else:
-            return self.initialize_vision_modules_from_openai_clip(vision_tower, mm_vision_select_layer,
-                                pretrain_mm_mlp_adapter=None, tune_mm_mlp_adapter=False)
+            return self.initialize_vision_modules_from_openai_clip(
+                vision_tower,
+                mm_vision_select_layer,
+                pretrain_mm_mlp_adapter=None,
+                tune_mm_mlp_adapter=False,
+            )
 
-
-
-    def initialize_vision_modules_from_openai_clip(self, vision_tower, mm_vision_select_layer,
-                                  pretrain_mm_mlp_adapter=None, tune_mm_mlp_adapter=False):
+    def initialize_vision_modules_from_openai_clip(
+        self,
+        vision_tower,
+        mm_vision_select_layer,
+        pretrain_mm_mlp_adapter=None,
+        tune_mm_mlp_adapter=False,
+    ):
         self.config.mm_vision_tower = vision_tower
 
         image_processor = CLIPImageProcessor.from_pretrained(vision_tower)
 
-        if not hasattr(self, 'vision_tower'):
+        if not hasattr(self, "vision_tower"):
             vision_tower = CLIPVisionModel.from_pretrained(vision_tower)
         else:
             vision_tower = self.vision_tower[0]
@@ -94,46 +130,61 @@ class LlavaLlamaModel(LlamaModel):
         self.config.mm_hidden_size = vision_config.hidden_size
         self.config.mm_vision_select_layer = mm_vision_select_layer
 
-        if not hasattr(self, 'mm_projector'):
-            self.mm_projector = nn.Linear(vision_config.hidden_size, self.config.hidden_size)
+        if not hasattr(self, "mm_projector"):
+            self.mm_projector = nn.Linear(
+                vision_config.hidden_size, self.config.hidden_size
+            )
 
         if pretrain_mm_mlp_adapter is not None:
-            mm_projector_weights = torch.load(pretrain_mm_mlp_adapter, map_location='cpu')
-            self.mm_projector.load_state_dict({k.split('.')[-1]: v for k, v in mm_projector_weights.items()})
+            mm_projector_weights = torch.load(
+                pretrain_mm_mlp_adapter, map_location="cpu"
+            )
+            self.mm_projector.load_state_dict(
+                {k.split(".")[-1]: v for k, v in mm_projector_weights.items()}
+            )
 
         return dict(
             image_processor=image_processor,
             image_token_len=num_patches,
-            vision_config=vision_config
+            vision_config=vision_config,
         )
 
-    def initialize_vision_modules_from_biomed_clip(self, vision_tower, mm_vision_select_layer,
-                                  pretrain_mm_mlp_adapter=None, tune_mm_mlp_adapter=False):
+    def initialize_vision_modules_from_biomed_clip(
+        self,
+        vision_tower,
+        mm_vision_select_layer,
+        pretrain_mm_mlp_adapter=None,
+        tune_mm_mlp_adapter=False,
+    ):
         self.config.mm_vision_tower = vision_tower
 
-        
-
-        image_processor = CLIPImageProcessor.from_pretrained("openai/clip-vit-base-patch16")
-        openai_vision_tower = CLIPVisionModel.from_pretrained("openai/clip-vit-base-patch16")
+        image_processor = CLIPImageProcessor.from_pretrained(
+            "openai/clip-vit-base-patch16"
+        )
+        openai_vision_tower = CLIPVisionModel.from_pretrained(
+            "openai/clip-vit-base-patch16"
+        )
         vision_config = openai_vision_tower.config
         del openai_vision_tower
-                
-        if not hasattr(self, 'vision_tower'):
-            model, _, _ = open_clip.create_model_and_transforms('hf-hub:microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224')
-            vision_tower = model.visual.trunk # Please refer: https://github.com/mlfoundations/open_clip/blob/main/src/open_clip/timm_model.py#LL60C18-L60C18
+
+        if not hasattr(self, "vision_tower"):
+            model, _, _ = open_clip.create_model_and_transforms(
+                "hf-hub:microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224"
+            )
+            vision_tower = (
+                model.visual.trunk
+            )  # Please refer: https://github.com/mlfoundations/open_clip/blob/main/src/open_clip/timm_model.py#LL60C18-L60C18
 
             # from huggingface_hub import snapshot_download
             # BiomedCLIP_file_path = "biomed-clip-share"
             # # snapshot_download("microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224", local_dir=BiomedCLIP_file_path)
-            # with open(os.path.join(BiomedCLIP_file_path, "open_clip_config.json"), 'r') as file:  
-            #     config = json.load(file) 
-
+            # with open(os.path.join(BiomedCLIP_file_path, "open_clip_config.json"), 'r') as file:
+            #     config = json.load(file)
 
         else:
             vision_tower = self.vision_tower[0]
 
-        
-        setattr(vision_tower, 'config', vision_config)
+        setattr(vision_tower, "config", vision_config)
         vision_tower.requires_grad_(False)
         vision_tower = vision_tower.to(torch.float16)
         self.vision_tower = [vision_tower]
@@ -144,34 +195,50 @@ class LlavaLlamaModel(LlamaModel):
         self.config.mm_hidden_size = vision_config.hidden_size
         self.config.mm_vision_select_layer = mm_vision_select_layer
 
-        if not hasattr(self, 'mm_projector'):
-            self.mm_projector = nn.Linear(vision_config.hidden_size, self.config.hidden_size)
+        if not hasattr(self, "mm_projector"):
+            self.mm_projector = nn.Linear(
+                vision_config.hidden_size, self.config.hidden_size
+            )
 
         if pretrain_mm_mlp_adapter is not None:
-            mm_projector_weights = torch.load(pretrain_mm_mlp_adapter, map_location='cpu')
-            self.mm_projector.load_state_dict({k.split('.')[-1]: v for k, v in mm_projector_weights.items()})
+            mm_projector_weights = torch.load(
+                pretrain_mm_mlp_adapter, map_location="cpu"
+            )
+            self.mm_projector.load_state_dict(
+                {k.split(".")[-1]: v for k, v in mm_projector_weights.items()}
+            )
 
         return dict(
             image_processor=image_processor,
             image_token_len=num_patches,
-            vision_config=vision_config
+            vision_config=vision_config,
         )
 
     def extract_visual_features(self, vision_tower, images):
         select_hidden_state_layer = getattr(self.config, "mm_vision_select_layer", -1)
 
-        
-        if "BiomedCLIP" in self.vision_tower_name  or "biomed_clip" in self.vision_tower_name:
-            image_forward_outs = vision_tower.get_intermediate_layers(images, n=3) # take last n blocks if n is an int, if in is a sequence, select by matching indices
+        if (
+            "BiomedCLIP" in self.vision_tower_name
+            or "biomed_clip" in self.vision_tower_name
+        ):
+            image_forward_outs = vision_tower.get_intermediate_layers(
+                images, n=3
+            )  # take last n blocks if n is an int, if in is a sequence, select by matching indices
             image_features = image_forward_outs[select_hidden_state_layer]
             image_features = image_features
-            dummy_image_features = torch.zeros(196, 768, device=image_features.device, dtype=image_features.dtype)
+            dummy_image_features = torch.zeros(
+                196, 768, device=image_features.device, dtype=image_features.dtype
+            )
         else:
             image_forward_outs = vision_tower(images, output_hidden_states=True)
-            select_hidden_state = image_forward_outs.hidden_states[select_hidden_state_layer]
+            select_hidden_state = image_forward_outs.hidden_states[
+                select_hidden_state_layer
+            ]
             image_features = select_hidden_state[:, 1:]
-            dummy_image_features = torch.zeros(256, 1024, device=image_features.device, dtype=image_features.dtype)
-        
+            dummy_image_features = torch.zeros(
+                256, 1024, device=image_features.device, dtype=image_features.dtype
+            )
+
         return image_features, dummy_image_features
 
     def forward(
@@ -186,9 +253,8 @@ class LlavaLlamaModel(LlamaModel):
         images: Optional[torch.FloatTensor] = None,
         return_dict: Optional[bool] = None,
     ) -> Union[Tuple, BaseModelOutputWithPast]:
-
         # HACK: replace back original embeddings for LLaVA pretraining
-        orig_embeds_params = getattr(self, 'orig_embeds_params', None)
+        orig_embeds_params = getattr(self, "orig_embeds_params", None)
         # if orig_embeds_params is not None:
         #     orig_embeds_params = orig_embeds_params[0]
         #     with torch.no_grad():
@@ -197,8 +263,12 @@ class LlavaLlamaModel(LlamaModel):
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
 
-        vision_tower = getattr(self, 'vision_tower', None)
-        if vision_tower is not None and (input_ids.shape[1] != 1 or self.training) and images is not None:
+        vision_tower = getattr(self, "vision_tower", None)
+        if (
+            vision_tower is not None
+            and (input_ids.shape[1] != 1 or self.training)
+            and images is not None
+        ):
             # TODO: this is a modified multimodal LLM -- Haotian Liu
             vision_tower = vision_tower[0]  # HACK: for FSDP
             with torch.no_grad():
@@ -206,68 +276,158 @@ class LlavaLlamaModel(LlamaModel):
                     # variable length images
                     image_features = []
                     for image in images:
-                        image_feature, dummy_image_features = self.extract_visual_features(vision_tower, image.unsqueeze(0))
+                        (
+                            image_feature,
+                            dummy_image_features,
+                        ) = self.extract_visual_features(
+                            vision_tower, image.unsqueeze(0)
+                        )
                         image_features.append(image_feature)
                 else:
-                    image_features, dummy_image_features = self.extract_visual_features(vision_tower, images)
+                    image_features, dummy_image_features = self.extract_visual_features(
+                        vision_tower, images
+                    )
 
             if type(images) is list:
-                image_features = [self.mm_projector(image_feature)[0] for image_feature in image_features]
+                image_features = [
+                    self.mm_projector(image_feature)[0]
+                    for image_feature in image_features
+                ]
             else:
                 image_features = self.mm_projector(image_features)
-            
-            
+
             dummy_image_features = self.mm_projector(dummy_image_features)
 
             new_input_embeds = []
             cur_image_idx = 0
+            print(image_features.shape)
             for cur_input_ids, cur_input_embeds in zip(input_ids, inputs_embeds):
                 if (cur_input_ids == vision_tower.config.im_patch_token).sum() == 0:
                     # multimodal LLM, but the current sample is not multimodal
-                    cur_input_embeds = cur_input_embeds + (0. * dummy_image_features).sum()
+                    cur_input_embeds = (
+                        cur_input_embeds + (0.0 * dummy_image_features).sum()
+                    )
                     new_input_embeds.append(cur_input_embeds)
                     continue
                 if vision_tower.config.use_im_start_end:
                     cur_image_features = image_features[cur_image_idx]
                     num_patches = cur_image_features.shape[0]
-                    if (cur_input_ids == vision_tower.config.im_start_token).sum() != (cur_input_ids == vision_tower.config.im_end_token).sum():
-                        raise ValueError("The number of image start tokens and image end tokens should be the same.")
-                    image_start_tokens = torch.where(cur_input_ids == vision_tower.config.im_start_token)[0]
-                    
+                    if (cur_input_ids == vision_tower.config.im_start_token).sum() != (
+                        cur_input_ids == vision_tower.config.im_end_token
+                    ).sum():
+                        raise ValueError(
+                            "The number of image start tokens and image end tokens should be the same."
+                        )
+                    image_start_tokens = torch.where(
+                        cur_input_ids == vision_tower.config.im_start_token
+                    )[0]
+
                     for image_start_token_pos in image_start_tokens:
-                        cur_image_features = image_features[cur_image_idx].to(device=cur_input_embeds.device)
+                        cur_image_features = image_features[cur_image_idx].to(
+                            device=cur_input_embeds.device
+                        )
                         num_patches = cur_image_features.shape[0]
 
                         # import pdb; pdb.set_trace()
-                        if cur_input_ids[image_start_token_pos + num_patches + 1] != vision_tower.config.im_end_token:
-                            raise ValueError("The image end token should follow the image start token.")
+                        if (
+                            cur_input_ids[image_start_token_pos + num_patches + 1]
+                            != vision_tower.config.im_end_token
+                        ):
+                            raise ValueError(
+                                "The image end token should follow the image start token."
+                            )
                         if orig_embeds_params is not None:
-                            cur_new_input_embeds = torch.cat((cur_input_embeds[:image_start_token_pos].detach(), cur_input_embeds[image_start_token_pos:image_start_token_pos+1], cur_image_features, cur_input_embeds[image_start_token_pos + num_patches + 1:image_start_token_pos + num_patches + 2], cur_input_embeds[image_start_token_pos + num_patches + 2:].detach()), dim=0)
+                            cur_new_input_embeds = torch.cat(
+                                (
+                                    cur_input_embeds[:image_start_token_pos].detach(),
+                                    cur_input_embeds[
+                                        image_start_token_pos : image_start_token_pos
+                                        + 1
+                                    ],
+                                    cur_image_features,
+                                    cur_input_embeds[
+                                        image_start_token_pos
+                                        + num_patches
+                                        + 1 : image_start_token_pos
+                                        + num_patches
+                                        + 2
+                                    ],
+                                    cur_input_embeds[
+                                        image_start_token_pos + num_patches + 2 :
+                                    ].detach(),
+                                ),
+                                dim=0,
+                            )
                         else:
-                            cur_new_input_embeds = torch.cat((cur_input_embeds[:image_start_token_pos+1], cur_image_features, cur_input_embeds[image_start_token_pos + num_patches + 1:]), dim=0)
+                            cur_new_input_embeds = torch.cat(
+                                (
+                                    cur_input_embeds[: image_start_token_pos + 1],
+                                    cur_image_features,
+                                    cur_input_embeds[
+                                        image_start_token_pos + num_patches + 1 :
+                                    ],
+                                ),
+                                dim=0,
+                            )
                         cur_image_idx += 1
                     new_input_embeds.append(cur_new_input_embeds)
                 else:
                     cur_image_features = image_features[cur_image_idx]
                     num_patches = cur_image_features.shape[0]
-                    if (cur_input_ids == vision_tower.config.im_patch_token).sum() != num_patches:
-                        raise ValueError("The number of image patch tokens should be the same as the number of image patches.")
-                    masked_indices = torch.where(cur_input_ids == vision_tower.config.im_patch_token)[0]
+                    if (
+                        cur_input_ids == vision_tower.config.im_patch_token
+                    ).sum() != num_patches:
+                        raise ValueError(
+                            "The number of image patch tokens should be the same as the number of image patches."
+                        )
+                    masked_indices = torch.where(
+                        cur_input_ids == vision_tower.config.im_patch_token
+                    )[0]
                     mask_index_start = masked_indices[0]
-                    if (masked_indices != torch.arange(mask_index_start, mask_index_start+num_patches, device=masked_indices.device, dtype=masked_indices.dtype)).any():
-                        raise ValueError("The image patch tokens should be consecutive.")
+                    if (
+                        masked_indices
+                        != torch.arange(
+                            mask_index_start,
+                            mask_index_start + num_patches,
+                            device=masked_indices.device,
+                            dtype=masked_indices.dtype,
+                        )
+                    ).any():
+                        raise ValueError(
+                            "The image patch tokens should be consecutive."
+                        )
                     if orig_embeds_params is not None:
-                        cur_new_input_embeds = torch.cat((cur_input_embeds[:mask_index_start].detach(), cur_image_features, cur_input_embeds[mask_index_start+num_patches:].detach()), dim=0)
+                        cur_new_input_embeds = torch.cat(
+                            (
+                                cur_input_embeds[:mask_index_start].detach(),
+                                cur_image_features,
+                                cur_input_embeds[
+                                    mask_index_start + num_patches :
+                                ].detach(),
+                            ),
+                            dim=0,
+                        )
                     else:
-                        cur_new_input_embeds = torch.cat((cur_input_embeds[:mask_index_start], cur_image_features, cur_input_embeds[mask_index_start+num_patches:]), dim=0)
+                        cur_new_input_embeds = torch.cat(
+                            (
+                                cur_input_embeds[:mask_index_start],
+                                cur_image_features,
+                                cur_input_embeds[mask_index_start + num_patches :],
+                            ),
+                            dim=0,
+                        )
                     new_input_embeds.append(cur_new_input_embeds)
             inputs_embeds = torch.stack(new_input_embeds, dim=0)
 
         return super(LlavaLlamaModel, self).forward(
-            input_ids=None, attention_mask=attention_mask, past_key_values=past_key_values,
-            inputs_embeds=inputs_embeds, use_cache=use_cache,
-            output_attentions=output_attentions, output_hidden_states=output_hidden_states,
-            return_dict=return_dict
+            input_ids=None,
+            attention_mask=attention_mask,
+            past_key_values=past_key_values,
+            inputs_embeds=inputs_embeds,
+            use_cache=use_cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
         )
 
 
@@ -296,11 +456,19 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM):
         images: Optional[torch.FloatTensor] = None,
         return_dict: Optional[bool] = None,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
-        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
-        output_hidden_states = (
-            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        output_attentions = (
+            output_attentions
+            if output_attentions is not None
+            else self.config.output_attentions
         )
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        output_hidden_states = (
+            output_hidden_states
+            if output_hidden_states is not None
+            else self.config.output_hidden_states
+        )
+        return_dict = (
+            return_dict if return_dict is not None else self.config.use_return_dict
+        )
 
         # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
         outputs = self.model(
@@ -312,7 +480,7 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM):
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
-            images=images
+            images=images,
         )
 
         hidden_states = outputs[0]
@@ -344,7 +512,12 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM):
         )
 
     def prepare_inputs_for_generation(
-        self, input_ids, past_key_values=None, attention_mask=None, inputs_embeds=None, **kwargs
+        self,
+        input_ids,
+        past_key_values=None,
+        attention_mask=None,
+        inputs_embeds=None,
+        **kwargs,
     ):
         if past_key_values:
             input_ids = input_ids[:, -1:]
@@ -365,49 +538,75 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM):
         )
         return model_inputs
 
-    def initialize_vision_tokenizer(self, mm_use_im_start_end, tokenizer, device,
-                                    tune_mm_mlp_adapter=False, pretrain_mm_mlp_adapter=None):
+    def initialize_vision_tokenizer(
+        self,
+        mm_use_im_start_end,
+        tokenizer,
+        device,
+        tune_mm_mlp_adapter=False,
+        pretrain_mm_mlp_adapter=None,
+    ):
         vision_config = self.model.vision_tower[0].config
         vision_config.use_im_start_end = mm_use_im_start_end
         tokenizer.add_tokens([DEFAULT_IMAGE_PATCH_TOKEN], special_tokens=True)
         self.resize_token_embeddings(len(tokenizer))
 
         if mm_use_im_start_end:
-            num_new_tokens = tokenizer.add_tokens([DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN], special_tokens=True)
+            num_new_tokens = tokenizer.add_tokens(
+                [DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN], special_tokens=True
+            )
             self.resize_token_embeddings(len(tokenizer))
-            vision_config.im_start_token, vision_config.im_end_token = tokenizer.convert_tokens_to_ids([DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN])
+            (
+                vision_config.im_start_token,
+                vision_config.im_end_token,
+            ) = tokenizer.convert_tokens_to_ids(
+                [DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN]
+            )
 
             if num_new_tokens > 0:
                 input_embeddings = self.get_input_embeddings().weight.data
                 output_embeddings = self.get_output_embeddings().weight.data
 
                 input_embeddings_avg = input_embeddings[:-num_new_tokens].mean(
-                    dim=0, keepdim=True)
+                    dim=0, keepdim=True
+                )
                 output_embeddings_avg = output_embeddings[:-num_new_tokens].mean(
-                    dim=0, keepdim=True)
+                    dim=0, keepdim=True
+                )
 
                 input_embeddings[-num_new_tokens:] = input_embeddings_avg
                 output_embeddings[-num_new_tokens:] = output_embeddings_avg
 
             if tune_mm_mlp_adapter:
-                self.model.orig_embeds_params = [self.get_input_embeddings().weight.data.clone().to(device=device)]
+                self.model.orig_embeds_params = [
+                    self.get_input_embeddings().weight.data.clone().to(device=device)
+                ]
                 for p in self.get_input_embeddings().parameters():
                     p.requires_grad = True
                 for p in self.get_output_embeddings().parameters():
                     p.requires_grad = False
 
             if pretrain_mm_mlp_adapter:
-                mm_projector_weights = torch.load(pretrain_mm_mlp_adapter, map_location='cpu')
-                embed_tokens_weight = mm_projector_weights['model.embed_tokens.weight']
+                mm_projector_weights = torch.load(
+                    pretrain_mm_mlp_adapter, map_location="cpu"
+                )
+                embed_tokens_weight = mm_projector_weights["model.embed_tokens.weight"]
                 assert num_new_tokens == 2
                 if input_embeddings.shape == embed_tokens_weight.shape:
-                    input_embeddings[-num_new_tokens:] = embed_tokens_weight[-num_new_tokens:]
+                    input_embeddings[-num_new_tokens:] = embed_tokens_weight[
+                        -num_new_tokens:
+                    ]
                 elif embed_tokens_weight.shape[0] == num_new_tokens:
                     input_embeddings[-num_new_tokens:] = embed_tokens_weight
                 else:
-                    raise ValueError(f"Unexpected embed_tokens_weight shape. Pretrained: {embed_tokens_weight.shape}. Current: {input_embeddings.shape}. Numer of new tokens: {num_new_tokens}.")
+                    raise ValueError(
+                        f"Unexpected embed_tokens_weight shape. Pretrained: {embed_tokens_weight.shape}. Current: {input_embeddings.shape}. Numer of new tokens: {num_new_tokens}."
+                    )
 
-        vision_config.im_patch_token = tokenizer.convert_tokens_to_ids([DEFAULT_IMAGE_PATCH_TOKEN])[0]
+        vision_config.im_patch_token = tokenizer.convert_tokens_to_ids(
+            [DEFAULT_IMAGE_PATCH_TOKEN]
+        )[0]
+
 
 AutoConfig.register("llava", LlavaConfig)
 AutoModelForCausalLM.register(LlavaConfig, LlavaLlamaForCausalLM)
