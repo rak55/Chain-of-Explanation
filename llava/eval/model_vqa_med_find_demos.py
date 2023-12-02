@@ -50,8 +50,8 @@ def eval_model(args):
     demo_split = dataset[args.demo_split]
     rationales = read_jsonl(args.rationales)
     rationales = {r["id"]: r["text"] for r in rationales}
-    demo_split.add_column("id", [idx for idx in range(len(demo_split))])
-    demo_split.add_column(
+    demo_split = demo_split.add_column("id", [idx for idx in range(len(demo_split))])
+    demo_split = demo_split.add_column(
         "rationale", [rationales[idx] for idx in range(len(demo_split))]
     )
 
