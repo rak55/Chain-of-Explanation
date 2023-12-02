@@ -69,7 +69,7 @@ def eval_model(args):
         elif args.index_mode == "image":
             demo_split = demo_split.map(
                 lambda x: {
-                    "embeddings": get_image_embeddings(x["image"])
+                    "embeddings": get_image_embeddings([x["image"]])
                     .detach()
                     .cpu()
                     .numpy()[0]
