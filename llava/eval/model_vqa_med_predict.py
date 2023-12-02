@@ -49,7 +49,7 @@ def load_pretrained_model(
 
     tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=False)
     model = LlavaLlamaForCausalLM.from_pretrained(
-        model_name, low_cpu_mem_usage=True, **kwargs
+        model_name, low_cpu_mem_usage=False, **kwargs
     )
 
     mm_use_im_start_end = getattr(model.config, "mm_use_im_start_end", False)
@@ -64,7 +64,7 @@ def load_pretrained_model(
         vision_tower = CLIPVisionModel.from_pretrained(
             vision_tower.config._name_or_path,
             torch_dtype=torch.bfloat16 if load_bf16 else torch.float16,
-            low_cpu_mem_usage=True,
+            low_cpu_mem_usage=False,
         ).cuda()
         model.model.vision_tower[0] = vision_tower
     else:
@@ -88,6 +88,41 @@ def load_pretrained_model(
         model.config.mm_vision_tower,
         torch_dtype=torch.bfloat16 if load_bf16 else torch.float16,
     )
+    image_token_len = (vision_config.image_size // vision_config.patch_size) ** 2
+    return model, tokenizer, image_processor, image_token_len
+
+
+def load_model(model_name):
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = LlavaLlamaForCausalLM.from_pretrained(
+        model_name, torch_dtype=torch.float16, use_cache=True
+    ).cuda()
+    image_processor = CLIPImageProcessor.from_pretrained(
+        model.config.mm_vision_tower, torch_dtype=torch.float16
+    )
+    vision_tower = model.model.vision_tower[0]
+    vision_tower.to(device="cuda", dtype=torch.float16)
+
+    mm_use_im_start_end = getattr(model.config, "mm_use_im_start_end", False)
+    tokenizer.add_tokens([DEFAULT_IMAGE_PATCH_TOKEN], special_tokens=True)
+    if mm_use_im_start_end:
+        tokenizer.add_tokens(
+            [DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN], special_tokens=True
+        )
+
+    # import pdb; pdb.set_trace()
+    vision_config = vision_tower.config
+    vision_config.im_patch_token = tokenizer.convert_tokens_to_ids(
+        [DEFAULT_IMAGE_PATCH_TOKEN]
+    )[0]
+    vision_config.use_im_start_end = mm_use_im_start_end
+    if mm_use_im_start_end:
+        (
+            vision_config.im_start_token,
+            vision_config.im_end_token,
+        ) = tokenizer.convert_tokens_to_ids(
+            [DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN]
+        )
     image_token_len = (vision_config.image_size // vision_config.patch_size) ** 2
     return model, tokenizer, image_processor, image_token_len
 
@@ -136,14 +171,14 @@ def eval_model(args):
     # Model
     disable_torch_init()
     model_name = os.path.expanduser(args.model)
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
     patch_config(model_name)
 
     print(model_name)
 
-    model, tokenizer, image_processor, image_token_len = load_pretrained_model(
-        model_name
-    )
+    # model, tokenizer, image_processor, image_token_len = load_pretrained_model(
+    #     model_name
+    # )
+    model, tokenizer, image_processor, image_token_len = load_model(model_name)
 
     print(f"Loading dataset: {args.dataset} ({args.split})")
     dataset = load_dataset(args.dataset)
@@ -188,7 +223,7 @@ def eval_model(args):
                 qs
                 + '\nIf the answer is "'
                 + answer
-                + '" then explain why in great detail, thinking step-by-step.'
+                + '" then explain why in great detail, thinking step-by-step. Be sure to reference evidence present in the provided image.'
             )
 
             conv = conv_templates["multimodal"].copy()
