@@ -153,7 +153,7 @@ if __name__ == "__main__":
         default="hf-hub:microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224",
     )
     parser.add_argument("--output", type=str, required=True)
-    parser.add_argument("--top_k", type=int, default=100)
+    parser.add_argument("--top_k", type=int, default=10)
     parser.add_argument("--dataset", type=str, default="flaviagiammarino/vqa-rad")
     parser.add_argument("--split", type=str, default="test")
     parser.add_argument("--demo_split", type=str, default="train")
