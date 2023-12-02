@@ -179,7 +179,6 @@ def eval_model(args):
     #     model_name
     # )
     model, tokenizer, image_processor, image_token_len = load_model(model_name)
-    print(image_token_len)
 
     print(f"Loading dataset: {args.dataset} ({args.split})")
     dataset = load_dataset(args.dataset)
@@ -205,6 +204,14 @@ def eval_model(args):
             answer = ex["answer"]
 
             qs = question
+
+            qs = (
+                qs
+                + '\nAssume the answer is "'
+                + answer
+                + '" and explain why this answer is correct in great detail, referencing the provided image. Think step-by-step, and make sure to only draw conclusions from evidence present in the following image:'
+            )
+
             image_tensor = image_processor.preprocess(image, return_tensors="pt")[
                 "pixel_values"
             ][0]
@@ -219,13 +226,6 @@ def eval_model(args):
                 )
             else:
                 qs = qs + "\n" + DEFAULT_IMAGE_PATCH_TOKEN * image_token_len
-
-            qs = (
-                qs
-                + '\nIf the answer is "'
-                + answer
-                + '" then explain why in great detail, thinking step-by-step. Be sure to reference evidence present in the provided image.'
-            )
 
             conv = conv_templates["multimodal"].copy()
             conv.append_message(conv.roles[0], qs)
