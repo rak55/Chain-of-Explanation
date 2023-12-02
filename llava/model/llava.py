@@ -269,6 +269,7 @@ class LlavaLlamaModel(LlamaModel):
             and (input_ids.shape[1] != 1 or self.training)
             and images is not None
         ):
+            print(images.shape)
             # TODO: this is a modified multimodal LLM -- Haotian Liu
             vision_tower = vision_tower[0]  # HACK: for FSDP
             with torch.no_grad():
@@ -287,6 +288,7 @@ class LlavaLlamaModel(LlamaModel):
                     image_features, dummy_image_features = self.extract_visual_features(
                         vision_tower, images
                     )
+            print(image_features.shape)
 
             if type(images) is list:
                 image_features = [
