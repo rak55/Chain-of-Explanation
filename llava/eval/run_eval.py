@@ -157,7 +157,6 @@ if __name__ == "__main__":
     print(f"Loading dataset: {args.dataset} ({args.split})")
     dataset = load_dataset(args.dataset)
     data_split = dataset[args.split]
-    print(f"\n========\n {dataset}")
 
     pred = load_jsonl(args.pred)
 
