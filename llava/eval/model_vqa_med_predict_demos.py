@@ -255,7 +255,8 @@ def eval_model(args):
             image_tensor = image_processor.preprocess(
                 [d["image"] for d in ex_demos] + [image], return_tensors="pt"
             )["pixel_values"][0]
-            images = image_tensor.unsqueeze(0).half().cuda()
+            # .unsqueeze(0) removed because multiple images are used
+            images = image_tensor.half().cuda()
             conv = conv_templates["multimodal"].copy()
 
             for d in ex_demos:
