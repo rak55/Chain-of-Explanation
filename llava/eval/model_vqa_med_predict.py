@@ -7,7 +7,7 @@ from tqdm import tqdm
 from datasets import load_dataset
 
 from llava import LlavaLlamaForCausalLM
-        from transformers import CLIPImageProcessor, CLIPVisionModel
+from transformers import CLIPImageProcessor, CLIPVisionModel
 from llava.conversation import conv_templates
 from llava.utils import disable_torch_init
 from transformers import StoppingCriteria, BitsAndBytesConfig
@@ -60,11 +60,17 @@ def load_pretrained_model(
         )
 
     vision_tower = model.model.vision_tower[0]
-    if vision_tower.device.type == 'meta':
-        vision_tower = CLIPVisionModel.from_pretrained(vision_tower.config._name_or_path, torch_dtype=torch.bfloat16 if load_bf16 else torch.float16, low_cpu_mem_usage=True).cuda()
+    if vision_tower.device.type == "meta":
+        vision_tower = CLIPVisionModel.from_pretrained(
+            vision_tower.config._name_or_path,
+            torch_dtype=torch.bfloat16 if load_bf16 else torch.float16,
+            low_cpu_mem_usage=True,
+        ).cuda()
         model.model.vision_tower[0] = vision_tower
     else:
-        vision_tower.to(device="cuda", dtype=torch.bfloat16 if load_bf16 else torch.float16)
+        vision_tower.to(
+            device="cuda", dtype=torch.bfloat16 if load_bf16 else torch.float16
+        )
 
     vision_config = vision_tower.config
     vision_config.im_patch_token = tokenizer.convert_tokens_to_ids(
@@ -78,7 +84,10 @@ def load_pretrained_model(
         ) = tokenizer.convert_tokens_to_ids(
             [DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN]
         )
-    image_processor = CLIPImageProcessor.from_pretrained(model.config.mm_vision_tower, torch_dtype=torch.bfloat16 if load_bf16 else torch.float16)
+    image_processor = CLIPImageProcessor.from_pretrained(
+        model.config.mm_vision_tower,
+        torch_dtype=torch.bfloat16 if load_bf16 else torch.float16,
+    )
     image_token_len = (vision_config.image_size // vision_config.patch_size) ** 2
     return model, tokenizer, image_processor, image_token_len
 
