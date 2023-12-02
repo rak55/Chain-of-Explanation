@@ -41,7 +41,6 @@ def load_jsonl(path):
 
 def evaluate(ds, pred):
     closed_scores = collections.defaultdict(list)
-    bleu_scores = collections.defaultdict(list)
     exact_scores = collections.defaultdict(list)
     f1_scores = collections.defaultdict(list)
     open_hit_scores = collections.defaultdict(list)
@@ -87,42 +86,10 @@ def evaluate(ds, pred):
             # if isinstance(f1_scores['hit'][-1], str):
             #     # import pdb; pdb.set_trace()
 
-            b_score = sentence_bleu(
-                references=[str(gt_value).lower().split()],
-                hypothesis=str(pred_value).lower().split(),
-            )
-            b_score_1 = sentence_bleu(
-                references=[str(gt_value).lower().split()],
-                hypothesis=str(pred_value).lower().split(),
-                weights=(1, 0, 0, 0),
-            )
-            b_score_2 = sentence_bleu(
-                references=[str(gt_value).lower().split()],
-                hypothesis=str(pred_value).lower().split(),
-                weights=(0, 1, 0, 0),
-            )
-            b_score_3 = sentence_bleu(
-                references=[str(gt_value).lower().split()],
-                hypothesis=str(pred_value).lower().split(),
-                weights=(0, 0, 1, 0),
-            )
-
-            # bleu_scores['q_id'].append(pred_item['question_id'])
-            bleu_scores["bleu_score"].append(b_score)
-            bleu_scores["bleu_score_1"].append(b_score_1)
-            bleu_scores["bleu_score_2"].append(b_score_2)
-            bleu_scores["bleu_score_3"].append(b_score_3)
-
     # import pdb; pdb.set_trace()
-    exact_score = sum(exact_scores["hit"]) / len(exact_scores["hit"])
-    f1_score = sum(f1_scores["f1"]) / len(f1_scores["f1"])
-    precision = sum(f1_scores["precision"]) / len(f1_scores["precision"])
+    # f1_score = sum(f1_scores["f1"]) / len(f1_scores["f1"])
+    # precision = sum(f1_scores["precision"]) / len(f1_scores["precision"])
     recall = sum(f1_scores["recall"]) / len(f1_scores["recall"])
-
-    bleu_score = sum(bleu_scores["bleu_score"]) / len(bleu_scores["bleu_score"])
-    bleu_score_1 = sum(bleu_scores["bleu_score_1"]) / len(bleu_scores["bleu_score_1"])
-    bleu_score_2 = sum(bleu_scores["bleu_score_2"]) / len(bleu_scores["bleu_score_2"])
-    bleu_score_3 = sum(bleu_scores["bleu_score_3"]) / len(bleu_scores["bleu_score_3"])
 
     open_hit_score = sum(open_hit_scores["hit"]) / len(open_hit_scores["hit"])
     closed_score = (
@@ -138,14 +105,9 @@ def evaluate(ds, pred):
         [
             ["yes/no accuracy", closed_score * 100],
             ["open accuracy", open_hit_score * 100],
-            ["exact match score", exact_score * 100],
-            ["f1 score", f1_score * 100],
-            ["precision", precision * 100],
+            # ["f1 score", f1_score * 100],
+            # ["precision", precision * 100],
             ["recall", recall * 100],
-            ["bleu_score", bleu_score * 100],
-            ["bleu_score_1", bleu_score_1 * 100],
-            ["bleu_score_2", bleu_score_2 * 100],
-            ["bleu_score_3", bleu_score_3 * 100],
         ],
         headers=["Metric", "Performance"],
     )
