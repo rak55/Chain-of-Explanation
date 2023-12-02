@@ -133,8 +133,6 @@ def eval_model(args):
                         }
                     )
 
-                demos = sorted(demos, key=lambda x: x["score"], reverse=True)
-
             f.write(
                 json.dumps(
                     {
@@ -146,6 +144,7 @@ def eval_model(args):
             )
 
 
+# requires open_clip_torch==2.23.0 and transformers==4.35.2
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
