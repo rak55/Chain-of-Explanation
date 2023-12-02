@@ -222,7 +222,7 @@ def eval_model(args):
         if rationale is not None and answer is not None:
             conv.append_message(
                 conv.roles[1],
-                f"{rationale}. My final answer is: {answer}",
+                f"{rationale} Therefore, the answer is {answer}",
             )
         else:
             conv.append_message(
@@ -275,8 +275,6 @@ def eval_model(args):
             prompt = conv.get_prompt()
             inputs = tokenizer([prompt])
 
-            print(prompt)
-
             input_ids = torch.as_tensor(inputs.input_ids).cuda()
 
             keywords = ["###"]
@@ -311,17 +309,6 @@ def eval_model(args):
                 index = outputs.index(conv.sep)
 
             outputs = outputs[:index].strip()
-            print(outputs)
-
-            lines = outputs.split("\n")
-
-            if len(lines) == 1:
-                print(f"[Warning] Sample {idx}: No rationale found")
-                rationale = outputs
-                pred = outputs
-            else:
-                rationale = "\n".join(lines[:-1])
-                pred = lines[-1]
 
             f.write(
                 json.dumps(
@@ -329,8 +316,8 @@ def eval_model(args):
                         "id": idx,
                         "prompt": prompt,
                         "text": outputs,
-                        "rationale": rationale,
-                        "pred": pred,
+                        "rationale": outputs,
+                        "pred": outputs,
                     }
                 )
                 + "\n"
