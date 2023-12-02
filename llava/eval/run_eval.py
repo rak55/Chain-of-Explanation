@@ -59,11 +59,10 @@ def evaluate(ds, pred):
             # for close-ended question (Yes/No)
             # closed_scores['q_id'].append(pred_item['question_id'])
             if "yes" in pred_value or "no" in pred_value:
-                f1_score, precision, recall = calculate_f1score(pred_value, gt_value)
-                if recall < 1:
-                    closed_scores["hit"].append(0)
-                else:
+                if gt_value in pred_value:
                     closed_scores["hit"].append(1)
+                else:
+                    closed_scores["hit"].append(0)
             else:
                 closed_scores["hit"].append(0)
         else:
