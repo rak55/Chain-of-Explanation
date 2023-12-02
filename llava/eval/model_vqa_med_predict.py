@@ -8,7 +8,6 @@ from datasets import load_dataset
 
 from llava import LlavaLlamaForCausalLM
 from llava.conversation import conv_templates
-from llava.utils import disable_torch_init
 from transformers import CLIPImageProcessor, StoppingCriteria
 
 
@@ -59,8 +58,6 @@ class KeywordsStoppingCriteria(StoppingCriteria):
 
 
 def eval_model(args):
-    # Model
-    disable_torch_init()
     model_name = os.path.expanduser(args.model)
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     patch_config(model_name)
