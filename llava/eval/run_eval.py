@@ -59,7 +59,10 @@ def evaluate(ds, pred):
             # for close-ended question (Yes/No)
             # closed_scores['q_id'].append(pred_item['question_id'])
             if "yes" in pred_value or "no" in pred_value:
-                if gt_value in pred_value:
+                f1_score, precision, recall = calculate_f1score(pred_value, gt_value)
+                if recall < 1:
+                    closed_scores["hit"].append(0)
+                else:
                     closed_scores["hit"].append(1)
             else:
                 closed_scores["hit"].append(0)
@@ -91,7 +94,7 @@ def evaluate(ds, pred):
     # precision = sum(f1_scores["precision"]) / len(f1_scores["precision"])
     recall = sum(f1_scores["recall"]) / len(f1_scores["recall"])
 
-    open_hit_score = sum(open_hit_scores["hit"]) / len(open_hit_scores["hit"])
+    # open_hit_score = sum(open_hit_scores["hit"]) / len(open_hit_scores["hit"])
     closed_score = (
         sum(closed_scores["hit"]) / len(closed_scores["hit"])
         if len(closed_scores["hit"]) != 0
@@ -103,11 +106,11 @@ def evaluate(ds, pred):
 
     return tabulate(
         [
-            ["yes/no accuracy", closed_score * 100],
-            ["open accuracy", open_hit_score * 100],
+            ["Closed Accuracy", closed_score * 100],
+            # ["open accuracy", open_hit_score * 100],
             # ["f1 score", f1_score * 100],
             # ["precision", precision * 100],
-            ["recall", recall * 100],
+            ["Open Recall", recall * 100],
         ],
         headers=["Metric", "Performance"],
     )
