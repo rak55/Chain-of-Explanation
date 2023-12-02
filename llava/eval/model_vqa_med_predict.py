@@ -242,7 +242,7 @@ def eval_model(args):
                     input_ids,
                     images=images,
                     do_sample=True,
-                    temperature=0.7,
+                    top_p=0.7,
                     max_new_tokens=1024,
                     stopping_criteria=[stopping_criteria],
                 )
