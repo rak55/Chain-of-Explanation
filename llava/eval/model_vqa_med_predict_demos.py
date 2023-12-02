@@ -202,7 +202,7 @@ def eval_model(args):
                 line = json.loads(line)
                 seen_ids.add(line["id"])
 
-    user_prompt = "Explain why your answer is correct in great detail, referencing the provided image. Think step-by-step, and make sure to only draw conclusions from evidence present in the following image:"
+    user_prompt = "Explain why your answer is correct in great detail, referencing the provided image. Think step-by-step, including a final answer. Only draw conclusions from evidence present in the following image:"
 
     def add_turn(conv, question, rationale=None, answer=None):
         qs = f"{question}\n{user_prompt}"
@@ -222,7 +222,7 @@ def eval_model(args):
         if rationale is not None and answer is not None:
             conv.append_message(
                 conv.roles[1],
-                f"{rationale}\nThe final answer is:\n{answer}",
+                f"{rationale}. My final answer is: {answer}",
             )
         else:
             conv.append_message(

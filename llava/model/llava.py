@@ -269,7 +269,6 @@ class LlavaLlamaModel(LlamaModel):
             and (input_ids.shape[1] != 1 or self.training)
             and images is not None
         ):
-            print(images.shape)
             # TODO: this is a modified multimodal LLM -- Haotian Liu
             vision_tower = vision_tower[0]  # HACK: for FSDP
             with torch.no_grad():
