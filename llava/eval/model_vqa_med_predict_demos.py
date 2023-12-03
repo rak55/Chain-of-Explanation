@@ -172,6 +172,13 @@ def read_jsonl(path):
         return [json.loads(line) for line in f]
 
 
+def format_rationale(rationale: str):
+    # If the rationale starts with "The answer is correct because" filter it out
+    if rationale.startswith("The answer is correct because"):
+        rationale = rationale[len("The answer is correct because") :].strip()
+    return rationale
+
+
 def eval_model(args):
     # Model
     disable_torch_init()
@@ -204,6 +211,7 @@ def eval_model(args):
 
     user_prompt = "Explain why your answer is correct in great detail, referencing the provided image. Think step-by-step, including a final answer. Only draw conclusions from evidence present in the following image:"
 
+    # TODO If the rationale starts with "The answer is correct because" filter it out
     def add_turn(conv, question, rationale=None, answer=None):
         qs = f"{question}\n{user_prompt}"
 
@@ -220,6 +228,7 @@ def eval_model(args):
 
         conv.append_message(conv.roles[0], qs)
         if rationale is not None and answer is not None:
+            rationale = format_rationale(rationale)
             conv.append_message(
                 conv.roles[1],
                 f"{rationale} Therefore, the answer is {answer}",

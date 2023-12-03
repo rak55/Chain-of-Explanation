@@ -19,6 +19,13 @@ def read_jsonl(path):
         return [json.loads(line) for line in f]
 
 
+def format_rationale(rationale: str):
+    # If the rationale starts with "The answer is correct because" filter it out
+    if rationale.startswith("The answer is correct because"):
+        rationale = rationale[len("The answer is correct because") :].strip()
+    return rationale
+
+
 def eval_model(args):
     # Model
     disable_torch_init()
@@ -49,7 +56,7 @@ def eval_model(args):
     print(f"Loading demos: {args.dataset} ({args.demo_split})")
     demo_split = dataset[args.demo_split]
     rationales = read_jsonl(args.rationales)
-    rationales = {r["id"]: r["text"] for r in rationales}
+    rationales = {r["id"]: format_rationale(r["text"]) for r in rationales}
     demo_split = demo_split.add_column("id", [idx for idx in range(len(demo_split))])
     demo_split = demo_split.add_column(
         "rationale", [rationales[idx] for idx in range(len(demo_split))]
