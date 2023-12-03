@@ -58,11 +58,8 @@ def evaluate(ds, pred):
         if gt_value in closed_answers:
             # for close-ended question (Yes/No)
             # closed_scores['q_id'].append(pred_item['question_id'])
-            if "yes" in pred_value or "no" in pred_value:
-                if gt_value in pred_value:
-                    closed_scores["hit"].append(1)
-                else:
-                    closed_scores["hit"].append(0)
+            if gt_value in pred_value:
+                closed_scores["hit"].append(1)
             else:
                 closed_scores["hit"].append(0)
         else:

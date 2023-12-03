@@ -202,15 +202,9 @@ def eval_model(args):
             image = ex["image"]
             question = ex["question"]
             answer = ex["answer"]
+            conv = conv_templates["multimodal"].copy()
 
             qs = question
-
-            qs = (
-                qs
-                + '\nAssume the answer is "'
-                + answer
-                + '" and explain why this answer is correct in great detail, referencing the provided image. Think step-by-step, and make sure to only draw conclusions from evidence present in the following image:'
-            )
 
             image_tensor = image_processor.preprocess(image, return_tensors="pt")[
                 "pixel_values"
@@ -227,9 +221,14 @@ def eval_model(args):
             else:
                 qs = qs + "\n" + DEFAULT_IMAGE_PATCH_TOKEN * image_token_len
 
-            conv = conv_templates["multimodal"].copy()
+            conv.append_message(conv.roles[0], qs)
+            conv.append_message(conv.roles[1], answer)
+
+            qs = "Explain why this answer is correct in great detail, referencing the provided image. Think step-by-step, and make sure to only draw conclusions from evidence present in the above image."
+
             conv.append_message(conv.roles[0], qs)
             conv.append_message(conv.roles[1], None)
+
             prompt = conv.get_prompt()
             inputs = tokenizer([prompt])
 
