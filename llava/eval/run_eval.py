@@ -50,7 +50,7 @@ def evaluate(ds, pred):
         ex = ds[idx]
 
         gt_value = ex["answer"].lower()
-        pred_value = pred[idx]["rationale"].lower() + pred[idx]["pred"].lower()
+        pred_value = pred[idx]["rationale"].lower() + " " + pred[idx]["pred"].lower()
 
         gt_value = normalize_word(gt_value)
         pred_value = normalize_word(pred_value)
