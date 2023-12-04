@@ -231,7 +231,7 @@ def eval_model(args):
             rationale = format_rationale(rationale)
             conv.append_message(
                 conv.roles[1],
-                rationale,
+                rationale + "\n",
             )
         else:
             conv.append_message(
@@ -246,7 +246,7 @@ def eval_model(args):
         if answer is not None:
             conv.append_message(
                 conv.roles[1],
-                answer,
+                answer + "\n",
             )
         else:
             conv.append_message(
