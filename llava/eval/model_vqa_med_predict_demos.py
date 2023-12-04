@@ -348,11 +348,20 @@ def eval_model(args):
                 question=question,
                 rationale=rationale,
             )
+            full_conv = final_conv.copy()
             add_a_turn(final_conv)
 
             pred = run(final_conv, images)
+            full_conv.append_message(full_conv.roles[1], pred)
 
-            print(final_conv.get_prompt())
+            print(
+                full_conv.get_prompt().replace(
+                    DEFAULT_IM_START_TOKEN
+                    + DEFAULT_IMAGE_PATCH_TOKEN * image_token_len
+                    + DEFAULT_IM_END_TOKEN,
+                    DEFAULT_IMAGE_TOKEN,
+                )
+            )
 
             f.write(
                 json.dumps(
