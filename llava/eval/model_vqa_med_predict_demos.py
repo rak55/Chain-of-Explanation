@@ -342,7 +342,6 @@ def eval_model(args):
             )
 
             rationale = run(conv, images)
-            print(rationale)
 
             add_r_turn(
                 final_conv,
@@ -353,7 +352,7 @@ def eval_model(args):
 
             pred = run(final_conv, images)
 
-            print(pred)
+            print(final_conv.get_prompt())
 
             f.write(
                 json.dumps(
