@@ -210,7 +210,7 @@ def eval_model(args):
                 seen_ids.add(line["id"])
 
     r_prompt = "Explain why your answer is correct in great detail, referencing the provided image. Think step-by-step, and make sure to only draw conclusions from evidence present in the provided image."
-    a_prompt = "What is the final answer to the question?"
+    a_prompt = "What is the final answer to the question? Be short and concise."
 
     def add_r_turn(conv, question: str, rationale: str | None = None):
         qs = f"{question} {r_prompt}"
@@ -295,7 +295,7 @@ def eval_model(args):
         return outputs
 
     with open(answers_file, "a") as f:
-        for idx in tqdm(range(len(data_split))):
+        for idx in range(len(data_split)):
             if idx in seen_ids:
                 continue
             ex = data_split[idx]
@@ -352,7 +352,7 @@ def eval_model(args):
             add_a_turn(final_conv)
 
             pred = run(final_conv, images)
-            full_conv.append_message(full_conv.roles[1], pred)
+            add_a_turn(full_conv, answer=pred)
 
             print(
                 full_conv.get_prompt().replace(
