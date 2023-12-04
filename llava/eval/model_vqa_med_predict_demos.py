@@ -209,11 +209,11 @@ def eval_model(args):
                 line = json.loads(line)
                 seen_ids.add(line["id"])
 
-    user_prompt = "Explain why your answer is correct in great detail, referencing the provided image. Think step-by-step, including a final answer. Only draw conclusions from evidence present in the following image:"
+    r_prompt = "Explain why your answer is correct in great detail, referencing the provided image. Think step-by-step, and make sure to only draw conclusions from evidence present in the provided image."
+    a_prompt = "What is the final answer to the question?"
 
-    # TODO If the rationale starts with "The answer is correct because" filter it out
-    def add_turn(conv, question, rationale=None, answer=None):
-        qs = f"{question}\n{user_prompt}"
+    def add_r_turn(conv, question: str, rationale: str | None = None):
+        qs = f"{question} {r_prompt}"
 
         if getattr(model.config, "mm_use_im_start_end", False):
             qs = (
@@ -227,17 +227,72 @@ def eval_model(args):
             qs = qs + "\n" + DEFAULT_IMAGE_PATCH_TOKEN * image_token_len
 
         conv.append_message(conv.roles[0], qs)
-        if rationale is not None and answer is not None:
+        if rationale is not None:
             rationale = format_rationale(rationale)
             conv.append_message(
                 conv.roles[1],
-                f"{rationale} Therefore, the answer is {answer}",
+                rationale,
             )
         else:
             conv.append_message(
                 conv.roles[1],
                 None,
             )
+
+    def add_a_turn(conv, answer: str | None = None):
+        qs = a_prompt
+
+        conv.append_message(conv.roles[0], qs)
+        if answer is not None:
+            conv.append_message(
+                conv.roles[1],
+                answer,
+            )
+        else:
+            conv.append_message(
+                conv.roles[1],
+                None,
+            )
+
+    def run(conv, images):
+        prompt = conv.get_prompt()
+        inputs = tokenizer([prompt])
+
+        input_ids = torch.as_tensor(inputs.input_ids).cuda()
+
+        keywords = [conv.sep]
+        stopping_criteria = KeywordsStoppingCriteria(keywords, tokenizer, input_ids)
+
+        with torch.inference_mode():
+            output_ids = model.generate(
+                input_ids,
+                images=images,
+                do_sample=True,
+                top_p=0.7,
+                max_new_tokens=1024,
+                stopping_criteria=[stopping_criteria],
+            )
+
+        input_token_len = input_ids.shape[1]
+        n_diff_input_output = (
+            (input_ids != output_ids[:, :input_token_len]).sum().item()
+        )
+        if n_diff_input_output > 0:
+            print(
+                f"[Warning] Sample {idx}: {n_diff_input_output} output_ids are not the same as the input_ids"
+            )
+        outputs = tokenizer.batch_decode(
+            output_ids[:, input_token_len:], skip_special_tokens=True
+        )[0]
+
+        try:
+            index = outputs.index(conv.sep)
+        except ValueError:
+            outputs += conv.sep
+            index = outputs.index(conv.sep)
+
+        outputs = outputs[:index].strip()
+        return outputs
 
     with open(answers_file, "a") as f:
         for idx in tqdm(range(len(data_split))):
@@ -269,64 +324,43 @@ def eval_model(args):
             conv = conv_templates["multimodal"].copy()
 
             for d in ex_demos:
-                add_turn(
+                add_r_turn(
                     conv,
                     question=d["question"],
                     rationale=d["rationale"],
+                )
+                add_a_turn(
+                    conv,
                     answer=d["answer"],
                 )
 
-            add_turn(
+            final_conv = conv.copy()
+
+            add_r_turn(
                 conv,
                 question=question,
             )
 
-            prompt = conv.get_prompt()
-            inputs = tokenizer([prompt])
+            rationale = run(conv, images)
+            print(rationale)
 
-            input_ids = torch.as_tensor(inputs.input_ids).cuda()
-
-            keywords = ["###"]
-            stopping_criteria = KeywordsStoppingCriteria(keywords, tokenizer, input_ids)
-
-            with torch.inference_mode():
-                output_ids = model.generate(
-                    input_ids,
-                    images=images,
-                    do_sample=True,
-                    top_p=0.7,
-                    max_new_tokens=1024,
-                    stopping_criteria=[stopping_criteria],
-                )
-
-            input_token_len = input_ids.shape[1]
-            n_diff_input_output = (
-                (input_ids != output_ids[:, :input_token_len]).sum().item()
+            add_r_turn(
+                final_conv,
+                question=question,
+                rationale=rationale,
             )
-            if n_diff_input_output > 0:
-                print(
-                    f"[Warning] Sample {idx}: {n_diff_input_output} output_ids are not the same as the input_ids"
-                )
-            outputs = tokenizer.batch_decode(
-                output_ids[:, input_token_len:], skip_special_tokens=True
-            )[0]
+            add_a_turn(final_conv)
 
-            try:
-                index = outputs.index(conv.sep)
-            except ValueError:
-                outputs += conv.sep
-                index = outputs.index(conv.sep)
+            pred = run(final_conv, images)
 
-            outputs = outputs[:index].strip()
+            print(pred)
 
             f.write(
                 json.dumps(
                     {
                         "id": idx,
-                        "prompt": prompt,
-                        "text": outputs,
-                        "rationale": outputs,
-                        "pred": outputs,
+                        "rationale": rationale,
+                        "pred": pred,
                     }
                 )
                 + "\n"
