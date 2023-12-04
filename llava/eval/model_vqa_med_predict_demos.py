@@ -295,7 +295,7 @@ def eval_model(args):
         return outputs
 
     with open(answers_file, "a") as f:
-        for idx in range(len(data_split)):
+        for idx in tqdm(range(len(data_split))):
             if idx in seen_ids:
                 continue
             ex = data_split[idx]
@@ -354,14 +354,14 @@ def eval_model(args):
             pred = run(final_conv, images)
             add_a_turn(full_conv, answer=pred)
 
-            print(
-                full_conv.get_prompt().replace(
-                    DEFAULT_IM_START_TOKEN
-                    + DEFAULT_IMAGE_PATCH_TOKEN * image_token_len
-                    + DEFAULT_IM_END_TOKEN,
-                    DEFAULT_IMAGE_TOKEN,
-                )
-            )
+            # print(
+            #     full_conv.get_prompt().replace(
+            #         DEFAULT_IM_START_TOKEN
+            #         + DEFAULT_IMAGE_PATCH_TOKEN * image_token_len
+            #         + DEFAULT_IM_END_TOKEN,
+            #         DEFAULT_IMAGE_TOKEN,
+            #     )
+            # )
 
             f.write(
                 json.dumps(
