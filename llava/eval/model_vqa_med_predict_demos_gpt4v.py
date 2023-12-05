@@ -74,7 +74,7 @@ class ContextCreator:
     def create_prompt(self, ex):
         image = ex["image"]
         question = ex["question"]
-        base64_image = base64.b64encode(image.tobytes()).encode("ascii")
+        base64_image = base64.b64encode(image.tobytes()).decode("ascii")
         image_url = f"data:image/jpeg;base64,{base64_image}"
 
         return {
