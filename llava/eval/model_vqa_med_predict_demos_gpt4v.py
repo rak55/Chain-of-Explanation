@@ -1,5 +1,6 @@
 import argparse
 import base64
+from io import BytesIO
 import os
 import time
 from tqdm import tqdm
@@ -74,7 +75,10 @@ class ContextCreator:
     def create_prompt(self, ex):
         image = ex["image"]
         question = ex["question"]
-        base64_image = base64.b64encode(image.tobytes()).decode("ascii")
+        buffered = BytesIO()
+        image.save(buffered, format="JPEG")
+        base64_image = base64.b64encode(buffered.getvalue()).decode("ascii")
+
         image_url = f"data:image/jpeg;base64,{base64_image}"
 
         return {
