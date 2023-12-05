@@ -151,6 +151,7 @@ def eval_model(
             ex = data_split[idx]
 
             messages = creator.create_context(idx, ex)
+            print_messages(messages)
             with MinimumDelay(config.delay):
                 completion = chat(
                     client,
@@ -166,6 +167,7 @@ def eval_model(
                 content = completion.choices[0].message.content
 
             messages.append({"role": "assistant", "content": content})
+            print_messages([messages[-1]])
 
             f.write(
                 json.dumps(
