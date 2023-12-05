@@ -1,0 +1,12 @@
+seed: 0
+# 200 RPM / 60 = 3.33, round to 4 seconds per req
+delay: 4
+model: gpt-4-vision-preview
+max_tokens: 1024
+temperature: 1.0
+top_p: 0.7
+num_demos: 1
+system_prompt: >
+  You are a helpful linguistic assistant.
+  Explain why your answer is correct in great detail, referencing the provided image. Think step-by-step, and make sure to only draw conclusions from evidence present in the provided image.
+  Your final sentence should include your final answer to the question.
