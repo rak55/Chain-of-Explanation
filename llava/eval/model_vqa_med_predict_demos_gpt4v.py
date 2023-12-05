@@ -92,7 +92,7 @@ class ContextCreator:
         d_idx = d["id"]
         ex = self.demo_split[d_idx]
         rationale = format_rationale(d["rationale"])
-        answer = d["answer"]
+        answer = ex["answer"]
         return [
             self.create_prompt(ex),
             {"role": "assistant", "content": f"{rationale} {answer}"},
