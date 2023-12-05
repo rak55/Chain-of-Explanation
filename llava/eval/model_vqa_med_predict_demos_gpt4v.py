@@ -156,13 +156,13 @@ def eval_model(
                 seen_ids.add(line["id"])
 
     with open(answers_file, "a") as f:
-        for idx in tqdm(range(len(data_split)), disable=True):
+        for idx in tqdm(range(len(data_split))):
             if idx in seen_ids:
                 continue
             ex = data_split[idx]
 
             messages = creator.create_context(idx, ex)
-            print_messages(messages)
+            # print_messages(messages)
             with MinimumDelay(config.delay):
                 completion = chat(
                     client,
@@ -178,14 +178,14 @@ def eval_model(
                 content = completion.choices[0].message.content
 
             messages.append({"role": "assistant", "content": content})
-            print_messages([messages[-1]])
-            print("---")
+            # print_messages([messages[-1]])
+            # print("---")
 
             f.write(
                 json.dumps(
                     {
                         "id": idx,
-                        "rationale": content,
+                        "rationale": "",
                         "pred": content,
                     }
                 )
