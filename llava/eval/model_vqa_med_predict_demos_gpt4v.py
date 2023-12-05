@@ -106,13 +106,13 @@ class ContextCreator:
         for demo in self.demos[ex_id][: self.config.num_demos]:
             messages.extend(self.create_demo(demo))
         messages.append(self.create_prompt(ex))
+        return messages
 
 
 def print_messages(messages):
     for message in messages:
         print(f"{message['role']}: {message['content']}")
         print()
-    print("---")
 
 
 def eval_model(
@@ -168,6 +168,7 @@ def eval_model(
 
             messages.append({"role": "assistant", "content": content})
             print_messages([messages[-1]])
+            print("---")
 
             f.write(
                 json.dumps(
