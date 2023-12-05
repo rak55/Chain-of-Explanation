@@ -74,7 +74,7 @@ class ContextCreator:
     def create_prompt(self, ex):
         image = ex["image"]
         question = ex["question"]
-        base64_image = base64.b64encode(image.tobytes())
+        base64_image = base64.b64encode(image.tobytes()).encode("ascii")
         image_url = f"data:image/jpeg;base64,{base64_image}"
 
         return {
@@ -111,7 +111,14 @@ class ContextCreator:
 
 def print_messages(messages):
     for message in messages:
-        print(f"{message['role']}: {message['content']}")
+        if isinstance(message["content"], list):
+            for content in message["content"]:
+                if content["type"] == "text":
+                    print(f"{message['role']}: {content['text']}")
+                elif content["type"] == "image_url":
+                    print(f"{message['role']}: [IMAGE_URL]")
+        else:
+            print(f"{message['role']}: {message['content']}")
         print()
 
 
