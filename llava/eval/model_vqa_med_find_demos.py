@@ -1,16 +1,10 @@
 import argparse
-from transformers import AutoTokenizer, AutoConfig
 import torch
 import os
 import json
 from tqdm import tqdm
 from datasets import load_dataset
 
-from llava import LlavaLlamaForCausalLM
-from transformers import CLIPImageProcessor, CLIPVisionModel
-from llava.conversation import conv_templates
-from llava.utils import disable_torch_init
-from transformers import StoppingCriteria, BitsAndBytesConfig
 from open_clip import create_model_from_pretrained, get_tokenizer
 
 
@@ -27,9 +21,6 @@ def format_rationale(rationale: str):
 
 
 def eval_model(args):
-    # Model
-    disable_torch_init()
-
     model_name = args.model
     print(f"Loading model: {model_name}")
 
