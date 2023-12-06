@@ -1,6 +1,6 @@
 seed: 0
-# 200 RPM / 60 = 3.33, round to 4 seconds per req
-delay: 4
+# 200 RPM / 60 = 3.33 req / second, or 0.3 sec / request
+delay: 1
 model: gpt-4-vision-preview
 max_tokens: 1024
 temperature: 1.0
