@@ -222,8 +222,7 @@ def eval_model(
     usage.init(len(data_split) - len(seen_ids))
 
     with open(answers_file, "a") as f:
-        with tqdm(total=len(data_split)) as pbar:
-            pbar.update(len(seen_ids))
+        with tqdm(total=len(data_split), initial=len(seen_ids)) as pbar:
             for idx in range(len(data_split)):
                 if idx in seen_ids:
                     continue
