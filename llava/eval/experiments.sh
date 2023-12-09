@@ -59,3 +59,17 @@ python llava/eval/model_vqa_med_predict_demos_gpt4v.py \
 python llava/eval/run_eval.py \
     --dataset flaviagiammarino/vqa-rad \
     --pred /shared/aifiles/disk1/media/artifacts/LLaVA-Med/VQA-RAD/test-image-rationale-gpt4v-3-predictions-gpt4v.jsonl
+
+
+# /content/drive/MyDrive/Data/SLAKE/SLAKE.hf
+python llava/eval/model_vqa_med_predict_gpt4v.py \
+    --config configs/gpt-4v-pred.yaml \
+    --dataset /content/drive/MyDrive/Data/SLAKE/SLAKE.hf \
+    --output /shared/aifiles/disk1/media/artifacts/LLaVA-Med/SLAKE/train-predictions-gpt4v.jsonl
+
+python llava/eval/model_vqa_med_find_demos.py \
+    --dataset /content/drive/MyDrive/Data/SLAKE/SLAKE.hf \
+    --rationales /shared/aifiles/disk1/media/artifacts/LLaVA-Med/SLAKE/train-predictions-gpt4v.jsonl \
+    --search_mode image \
+    --index_mode rationale \
+    --output /shared/aifiles/disk1/media/artifacts/LLaVA-Med/SLAKE/image-rationale-demos-gpt4v.jsonl

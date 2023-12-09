@@ -3,7 +3,7 @@ import torch
 import os
 import json
 from tqdm import tqdm
-from datasets import load_dataset
+from datasets import load_dataset, load_from_disk
 
 from open_clip import create_model_from_pretrained, get_tokenizer
 
@@ -42,7 +42,11 @@ def eval_model(args):
         return image_features
 
     print(f"Loading dataset: {args.dataset} ({args.split})")
-    dataset = load_dataset(args.dataset)
+    if args.dataset[0] == "/":
+        dataset = load_from_disk(args.dataset)
+    else:
+        dataset = load_dataset(args.dataset)
+
     data_split = dataset[args.split]
     print(f"Loading demos: {args.dataset} ({args.demo_split})")
     demo_split = dataset[args.demo_split]

@@ -4,7 +4,7 @@ from io import BytesIO
 import os
 import time
 from tqdm import tqdm
-from datasets import load_dataset
+from datasets import load_dataset, load_from_disk
 from openai import OpenAI, BadRequestError
 from openai.types.chat import ChatCompletion
 from tenacity import retry, stop_after_attempt, wait_random_exponential
@@ -198,7 +198,10 @@ def eval_model(
     output_path: str,
 ):
     print(f"Loading dataset: {dataset_name} ({split_name})")
-    dataset = load_dataset(dataset_name)
+    if dataset_name[0] == "/":
+        dataset = load_from_disk(dataset_name)
+    else:
+        dataset = load_dataset(dataset_name)
     data_split = dataset[split_name]
     demo_split = dataset[demo_split_name]
     demos = {d["id"]: d["demos"] for d in read_jsonl(demos_path)}

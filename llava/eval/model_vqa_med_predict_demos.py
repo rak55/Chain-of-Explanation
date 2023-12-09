@@ -4,7 +4,7 @@ import torch
 import os
 import json
 from tqdm import tqdm
-from datasets import load_dataset
+from datasets import load_dataset, load_from_disk
 
 from llava import LlavaLlamaForCausalLM
 from transformers import CLIPImageProcessor, CLIPVisionModel
@@ -193,7 +193,10 @@ def eval_model(args):
     model, tokenizer, image_processor, image_token_len = load_model(model_name)
 
     print(f"Loading dataset: {args.dataset} ({args.split})")
-    dataset = load_dataset(args.dataset)
+    if args.dataset[0] == "/":
+        dataset = load_from_disk(args.dataset)
+    else:
+        dataset = load_dataset(args.dataset)
     data_split = dataset[args.split]
     demo_split = dataset[args.demo_split]
     demos = read_jsonl(args.demos)
