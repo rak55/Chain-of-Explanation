@@ -297,75 +297,75 @@ def eval_model(args):
         outputs = outputs[:index].strip()
         return outputs
 
-    with open(answers_file, "a") as f:
-        for idx in tqdm(range(len(data_split))):
-            if idx in seen_ids:
-                continue
-            ex = data_split[idx]
-            image = ex["image"]
-            question = ex["question"]
+    for idx in tqdm(range(len(data_split))):
+        if idx in seen_ids:
+            continue
+        ex = data_split[idx]
+        image = ex["image"]
+        question = ex["question"]
 
-            ex_demo_items = demos[idx][: args.num_demos]
-            ex_demos = []
-            for d_item in ex_demo_items:
-                d_idx = d_item["id"]
-                d = demo_split[d_idx]
-                ex_demos.append(
-                    {
-                        "image": d["image"],
-                        "question": d["question"],
-                        "answer": d["answer"],
-                        "rationale": d_item["rationale"],
-                    }
-                )
+        ex_demo_items = demos[idx][: args.num_demos]
+        ex_demos = []
+        for d_item in ex_demo_items:
+            d_idx = d_item["id"]
+            d = demo_split[d_idx]
+            ex_demos.append(
+                {
+                    "image": d["image"],
+                    "question": d["question"],
+                    "answer": d["answer"],
+                    "rationale": d_item["rationale"],
+                }
+            )
 
-            image_tensor = image_processor.preprocess(
-                [d["image"] for d in ex_demos] + [image], return_tensors="pt"
-            )["pixel_values"]
-            # removed .unsqueeze(0)
-            images = image_tensor.half().cuda()
-            conv = conv_templates["multimodal"].copy()
+        image_tensor = image_processor.preprocess(
+            [d["image"] for d in ex_demos] + [image], return_tensors="pt"
+        )["pixel_values"]
+        # removed .unsqueeze(0)
+        images = image_tensor.half().cuda()
+        conv = conv_templates["multimodal"].copy()
 
-            for d in ex_demos:
-                add_r_turn(
-                    conv,
-                    question=d["question"],
-                    rationale=d["rationale"],
-                )
-                add_a_turn(
-                    conv,
-                    answer=d["answer"],
-                )
-
-            final_conv = conv.copy()
-
+        for d in ex_demos:
             add_r_turn(
                 conv,
-                question=question,
+                question=d["question"],
+                rationale=d["rationale"],
+            )
+            add_a_turn(
+                conv,
+                answer=d["answer"],
             )
 
-            rationale = run(conv, images)
+        final_conv = conv.copy()
 
-            add_r_turn(
-                final_conv,
-                question=question,
-                rationale=rationale,
-            )
-            full_conv = final_conv.copy()
-            add_a_turn(final_conv)
+        add_r_turn(
+            conv,
+            question=question,
+        )
 
-            pred = run(final_conv, images)
-            add_a_turn(full_conv, answer=pred)
+        rationale = run(conv, images)
 
-            # print(
-            #     full_conv.get_prompt().replace(
-            #         DEFAULT_IM_START_TOKEN
-            #         + DEFAULT_IMAGE_PATCH_TOKEN * image_token_len
-            #         + DEFAULT_IM_END_TOKEN,
-            #         DEFAULT_IMAGE_TOKEN,
-            #     )
-            # )
+        add_r_turn(
+            final_conv,
+            question=question,
+            rationale=rationale,
+        )
+        full_conv = final_conv.copy()
+        add_a_turn(final_conv)
 
+        pred = run(final_conv, images)
+        add_a_turn(full_conv, answer=pred)
+
+        # print(
+        #     full_conv.get_prompt().replace(
+        #         DEFAULT_IM_START_TOKEN
+        #         + DEFAULT_IMAGE_PATCH_TOKEN * image_token_len
+        #         + DEFAULT_IM_END_TOKEN,
+        #         DEFAULT_IMAGE_TOKEN,
+        #     )
+        # )
+
+        with open(answers_file, "a") as f:
             f.write(
                 json.dumps(
                     {
