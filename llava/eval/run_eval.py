@@ -1,7 +1,6 @@
 import argparse
 import json
 import collections
-from nltk.translate.bleu_score import sentence_bleu
 from eval_metrics.evaluate_metrics import (
     calculate_exactmatch,
     calculate_f1score,
@@ -10,7 +9,7 @@ from tabulate import tabulate
 from eval_metrics.glossary import normalize_word
 
 import warnings
-from datasets import load_dataset
+from datasets import load_dataset, load_from_disk
 
 warnings.simplefilter("ignore")
 
@@ -116,7 +115,10 @@ if __name__ == "__main__":
     args = parse_option()
 
     print(f"Loading dataset: {args.dataset} ({args.split})")
-    dataset = load_dataset(args.dataset)
+    if args.dataset[0] == "/":
+        dataset = load_from_disk(args.dataset)
+    else:
+        dataset = load_dataset(args.dataset)
     data_split = dataset[args.split]
 
     pred = load_jsonl(args.pred)
