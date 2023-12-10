@@ -224,34 +224,34 @@ def eval_model(
     usage = CompletionUsageEstimator()
     usage.init(len(data_split) - len(seen_ids))
 
-    with open(answers_file, "a") as f:
-        with tqdm(total=len(data_split), initial=len(seen_ids)) as pbar:
-            for idx in range(len(data_split)):
-                if idx in seen_ids:
+    with tqdm(total=len(data_split), initial=len(seen_ids)) as pbar:
+        for idx in range(len(data_split)):
+            if idx in seen_ids:
+                continue
+            ex = data_split[idx]
+
+            messages = creator.create_context(idx, ex)
+            # print_messages(messages)
+            with MinimumDelay(config.delay):
+                completion = chat(
+                    client,
+                    model=config.model,
+                    messages=messages,
+                    max_tokens=config.max_tokens,
+                    temperature=config.temperature,
+                    top_p=config.top_p,
+                    seed=config.seed,
+                )
+                if completion is None:
                     continue
-                ex = data_split[idx]
+                content = completion.choices[0].message.content
+                usage.update(completion)
+            messages.append({"role": "assistant", "content": content})
+            # print_messages([messages[-1]])
+            # print("---")
+            use = usage.estimate()
 
-                messages = creator.create_context(idx, ex)
-                # print_messages(messages)
-                with MinimumDelay(config.delay):
-                    completion = chat(
-                        client,
-                        model=config.model,
-                        messages=messages,
-                        max_tokens=config.max_tokens,
-                        temperature=config.temperature,
-                        top_p=config.top_p,
-                        seed=config.seed,
-                    )
-                    if completion is None:
-                        continue
-                    content = completion.choices[0].message.content
-                    usage.update(completion)
-                messages.append({"role": "assistant", "content": content})
-                # print_messages([messages[-1]])
-                # print("---")
-                use = usage.estimate()
-
+            with open(answers_file, "a") as f:
                 f.write(
                     json.dumps(
                         {
@@ -262,12 +262,12 @@ def eval_model(
                     )
                     + "\n"
                 )
-                pbar.update(1)
-                pbar.set_postfix(
-                    {
-                        "cost": f"${use.total_cost:.2f}",
-                    }
-                )
+            pbar.update(1)
+            pbar.set_postfix(
+                {
+                    "cost": f"${use.total_cost:.2f}",
+                }
+            )
 
 
 if __name__ == "__main__":
