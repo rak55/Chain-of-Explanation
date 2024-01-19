@@ -42,7 +42,7 @@ class KeywordsStoppingCriteria(StoppingCriteria):
                     return True
         return False
 
-#added old func.
+#added old funcs.
 def read_jsonl(path):
     with open(path, "r") as f:
         for line in f:
@@ -50,6 +50,14 @@ def read_jsonl(path):
             if line:
                 ex = json.loads(line)
                 yield ex
+                
+def load_image(image_file):
+    if image_file.startswith("http://") or image_file.startswith("https://"):
+        response = requests.get(image_file)
+        image = Image.open(BytesIO(response.content)).convert("RGB")
+    else:
+        image = Image.open(image_file).convert("RGB")
+    return image
                 
 
 def patch_config(config):
