@@ -193,7 +193,7 @@ def eval_model(args):
         
     #data_split = list(read_jsonl(args.input_path))
     #demo_split = dataset[args.demo_split]
-    demos = read_jsonl(args.demos)
+    demos = list(read_jsonl(args.demos))
     demos = demos[: args.num_demos]
     ex_demos = []
     for d_item in demos:
