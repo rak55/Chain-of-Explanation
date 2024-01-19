@@ -241,7 +241,9 @@ def eval_model(args):
     a_prompt = "What is the final answer to the question? Be short and concise."
 
     def add_r_turn(conv, text, labels, question: str, rationale: str | None = None):
-        label= "The meme is classified among the following categories: " + labels[:]
+        labelh= "The meme is classified among the following categories:"
+        h=" ".join(labels)
+        label=labelh + " " +h
         qs = f"{text} {label} {question} {r_prompt}"
 
         if getattr(model.config, "mm_use_im_start_end", False):
