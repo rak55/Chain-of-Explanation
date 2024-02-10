@@ -190,8 +190,8 @@ def eval_model(args):
 
     print(model_name)
 
-    model, tokenizer, image_processor, image_token_len = load_pretrained_model(model_name, args.load_8bit, args.load_4bit, args.load_bf16)
-    #model, tokenizer, image_processor, image_token_len = load_model(model_name)                   #see which to add load_model or load_pretrained model.
+    #model, tokenizer, image_processor, image_token_len = load_pretrained_model(model_name, args.load_8bit, args.load_4bit, args.load_bf16)
+    model, tokenizer, image_processor, image_token_len = load_model(model_name)                   #see which to add load_model or load_pretrained model.
 
     print(f"Loading dataset: {args.dataset}")
     if args.dataset[0] == "/":
