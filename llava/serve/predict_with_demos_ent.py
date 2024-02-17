@@ -11,11 +11,9 @@ from llava.utils import disable_torch_init
 #extra in cot
 from datasets import load_dataset, load_from_disk
 from transformers import AutoTokenizer, AutoConfig
-#from transformers import CLIPImageProcessor, CLIPVisionModel
-from llava.model.builder import load_pretrained_model
+from transformers import CLIPImageProcessor, CLIPVisionModel
 from transformers import StoppingCriteria, BitsAndBytesConfig
-from llava.mm_utils import get_model_name_from_path
-#from llava import LlavaLlamaForCausalLM
+from llava import LlavaLlamaForCausalLM
 
 DEFAULT_IMAGE_TOKEN = "<image>"
 DEFAULT_IMAGE_PATCH_TOKEN = "<im_patch>"
@@ -62,20 +60,138 @@ def load_image(image_file):
     return image
                 
 
+def patch_config(config):
+    patch_dict = {
+        "use_mm_proj": True,
+        "mm_vision_tower": "openai/clip-vit-large-patch14",
+        "mm_hidden_size": 1024,
+    }
 
+    cfg = AutoConfig.from_pretrained(config)
+    if not hasattr(cfg, "mm_vision_tower"):
+        print(
+            f"`mm_vision_tower` not found in `{config}`, applying patch and save to disk."
+        )
+        for k, v in patch_dict.items():
+            setattr(cfg, k, v)
+        cfg.save_pretrained(config)
+
+def load_pretrained_model(
+    model_name,
+    load_8bit=False,
+    load_4bit=False,
+    load_bf16=False,
+    device_map="auto",
+    device="cuda",
+):
+    kwargs = {"device_map": device_map}
+
+    if device != "cuda":
+        kwargs["device_map"] = {"": device}
+
+    if load_8bit:
+        kwargs["load_in_8bit"] = True
+    elif load_4bit:
+        kwargs["load_in_4bit"] = True
+        kwargs["quantization_config"] = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=torch.bfloat16 if load_bf16 else torch.float16,
+            bnb_4bit_use_double_quant=True,
+            bnb_4bit_quant_type="nf4",
+        )
+    if load_bf16:
+        kwargs["torch_dtype"] = torch.bfloat16
+    else:
+        kwargs["torch_dtype"] = torch.float16
+
+    tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=False)
+    model = LlavaLlamaForCausalLM.from_pretrained(
+        model_name, **kwargs
+    )                                                                            #took out low_mem_usga=False.
+
+    mm_use_im_start_end = getattr(model.config, "mm_use_im_start_end", False)
+    tokenizer.add_tokens([DEFAULT_IMAGE_PATCH_TOKEN], special_tokens=True)
+    if mm_use_im_start_end:
+        tokenizer.add_tokens(
+            [DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN], special_tokens=True
+        )
+
+    vision_tower = model.model.vision_tower[0]
+    if vision_tower.device.type == "meta":
+        vision_tower = CLIPVisionModel.from_pretrained(
+            vision_tower.config._name_or_path,
+            torch_dtype=torch.bfloat16 if load_bf16 else torch.float16,
+            low_cpu_mem_usage=False,
+        ).cuda()
+        model.model.vision_tower[0] = vision_tower
+    else:
+        vision_tower.to(
+            device="cuda", dtype=torch.bfloat16 if load_bf16 else torch.float16
+        )
+
+    vision_config = vision_tower.config
+    vision_config.im_patch_token = tokenizer.convert_tokens_to_ids(
+        [DEFAULT_IMAGE_PATCH_TOKEN]
+    )[0]
+    vision_config.use_im_start_end = mm_use_im_start_end
+    if mm_use_im_start_end:
+        (
+            vision_config.im_start_token,
+            vision_config.im_end_token,
+        ) = tokenizer.convert_tokens_to_ids(
+            [DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN]
+        )
+    image_processor = CLIPImageProcessor.from_pretrained(
+        model.config.mm_vision_tower,
+        torch_dtype=torch.bfloat16 if load_bf16 else torch.float16,
+    )
+    image_token_len = (vision_config.image_size // vision_config.patch_size) ** 2
+    return model, tokenizer, image_processor, image_token_len
+
+def load_model(model_name):
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = LlavaLlamaForCausalLM.from_pretrained(
+        model_name, torch_dtype=torch.float16, use_cache=True
+    ).cuda()
+    image_processor = CLIPImageProcessor.from_pretrained(
+        model.config.mm_vision_tower, torch_dtype=torch.float16
+    )
+    vision_tower = model.model.vision_tower[0]
+    vision_tower.to(device="cuda", dtype=torch.float16)
+
+    mm_use_im_start_end = getattr(model.config, "mm_use_im_start_end", False)
+    tokenizer.add_tokens([DEFAULT_IMAGE_PATCH_TOKEN], special_tokens=True)
+    if mm_use_im_start_end:
+        tokenizer.add_tokens(
+            [DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN], special_tokens=True
+        )
+
+    # import pdb; pdb.set_trace()
+    vision_config = vision_tower.config
+    vision_config.im_patch_token = tokenizer.convert_tokens_to_ids(
+        [DEFAULT_IMAGE_PATCH_TOKEN]
+    )[0]
+    vision_config.use_im_start_end = mm_use_im_start_end
+    if mm_use_im_start_end:
+        (
+            vision_config.im_start_token,
+            vision_config.im_end_token,
+        ) = tokenizer.convert_tokens_to_ids(
+            [DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN]
+        )
+    image_token_len = (vision_config.image_size // vision_config.patch_size) ** 2
+    return model, tokenizer, image_processor, image_token_len
 
 def eval_model(args):
     # Model
     disable_torch_init()
-    #model_name = os.path.expanduser(args.model)
-
-    model_name = get_model_name_from_path(args.model_path)
-    #patch_config(model_name)
+    model_name = os.path.expanduser(args.model)
+    patch_config(model_name)
 
     print(model_name)
 
-    model, tokenizer, image_processor, image_token_len = load_pretrained_model(args.model_path, args.model_base, model_name, args.load_8bit, args.load_4bit, args.load_bf16)
-    #model, tokenizer, image_processor, image_token_len = load_model(model_name)                   #see which to add load_model or load_pretrained model.
+    #model, tokenizer, image_processor, image_token_len = load_pretrained_model(model_name, args.load_8bit, args.load_4bit, args.load_bf16)
+    model, tokenizer, image_processor, image_token_len = load_model(model_name)                   #see which to add load_model or load_pretrained model.
 
     print(f"Loading dataset: {args.dataset}")
     if args.dataset[0] == "/":
@@ -153,6 +269,9 @@ def eval_model(args):
                 conv.roles[1],
                 None,
             )
+        prompt = conv.get_prompt()
+        print(prompt)
+        
 
     def add_a_turn(conv, answer: str | None = None):
         qs = a_prompt
@@ -174,6 +293,9 @@ def eval_model(args):
         inputs = tokenizer([prompt])
 
         input_ids = torch.as_tensor(inputs.input_ids).cuda()
+        input_token_len = input_ids.shape[1]
+        print(input_token_len)
+        assert input_ids.dtype==torch.long, "type is incorrect"
 
         keywords = [conv.sep]
         stopping_criteria = KeywordsStoppingCriteria(keywords, tokenizer, input_ids)
@@ -188,7 +310,6 @@ def eval_model(args):
                 stopping_criteria=[stopping_criteria],
             )
 
-        input_token_len = input_ids.shape[1]
         n_diff_input_output = (
             (input_ids != output_ids[:, :input_token_len]).sum().item()
         )
@@ -294,11 +415,10 @@ def eval_model(args):
             )
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model-path", type=str, required=True)
+    parser.add_argument("--model", type=str, required=True)
     parser.add_argument("--output", type=str, required=True)
     parser.add_argument("--demos", type=str, required=True)
     parser.add_argument("--images_path", type=str, required=True)
-    parser.add_argument("--model-base", type=str, default=None)
     parser.add_argument("--num_demos", type=int, default=3)
     parser.add_argument("--dataset", type=str, default="flaviagiammarino/vqa-rad")
     parser.add_argument("--load-8bit", action="store_true")
